@@ -21,7 +21,9 @@ export default class handler {
     clientSockets:Record<string/*namespace*/,Socket> = {}
     openRelaySocket(params:RelayParams) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
-        console.log(this.relaySocket) 
+        setTimeout(()=>{
+            console.log(this.relaySocket) 
+        },1000)
         this.relaySocket.emit('hybridRelayToken', {
             token:params.relayToken,
             id:params.relayId
@@ -125,7 +127,7 @@ export default class handler {
             console.error(err)
         })
         this.relaySocket.on('disconnect',reason => {
-            console.log(reason)
+            console.log(reason)//transport close
         })
     }
     

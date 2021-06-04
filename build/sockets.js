@@ -72,7 +72,9 @@ var handler = /** @class */ (function () {
     handler.prototype.openRelaySocket = function (params) {
         var _this = this;
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
-        console.log(this.relaySocket);
+        setTimeout(function () {
+            console.log(_this.relaySocket);
+        }, 1000);
         this.relaySocket.emit('hybridRelayToken', {
             token: params.relayToken,
             id: params.relayId
@@ -186,7 +188,7 @@ var handler = /** @class */ (function () {
             console.error(err);
         });
         this.relaySocket.on('disconnect', function (reason) {
-            console.log(reason);
+            console.log(reason); //transport close
         });
     };
     handler.prototype.emitOnRelaySocket = function (eventName, eventBody) {
