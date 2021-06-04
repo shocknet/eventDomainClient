@@ -24,114 +24,113 @@ export default class handler {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
         this.relaySocket.on('connect',()=>{
             console.log("new socket connection event")
-        })
-        const timeouts:NodeJS.Timeout[] = []
-        timeouts.push(this.waitAndCheck(3000,true,timeouts,cb))
-        timeouts.push(this.waitAndCheck(1500,false,timeouts,cb))
-        timeouts.push(this.waitAndCheck(1000,false,timeouts,cb))
-        timeouts.push(this.waitAndCheck(500,false,timeouts,cb))
-        this.relaySocket.emit('hybridRelayToken', {
-            token:params.relayToken,
-            id:params.relayId
-        },()=>{
-
-        })
-        this.relaySocket.on('relay:internal:messageForward',(body:RelayMessageEvent)=>{
-            if(!body || body.type !== 'socketEvent'){
-                this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
-            }
-            const {namespace,eventName,eventBody,queryCallbackId,socketCallbackId} = body
-            if(!this.clientSockets[namespace]){
-                console.log("no namespace found for message!!")
+            if(!this.relaySocket){
                 return
             }
-            console.log(`sending to API: ${eventName} on ${namespace} from relay`)
-            this.clientSockets[namespace].emit(eventName,eventBody,(error:any,response:any)=>{
-                const messageBody:RelayMessageSocketAck = {
-                    type:'ack',
-                    error,
-                    response,
-                    queryId:queryCallbackId,
-                    socketId:socketCallbackId
+            this.relaySocket.emit('hybridRelayToken', {
+                token:params.relayToken,
+                id:params.relayId
+            },()=>{
+    
+            })
+            this.relaySocket.on('relay:internal:messageForward',(body:RelayMessageEvent)=>{
+                if(!body || body.type !== 'socketEvent'){
+                    this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
                 }
-                console.log("got server Ack!")
-                console.log(messageBody)
-                this.emitOnRelaySocket('relay:internal:ackFromServer',messageBody)
+                const {namespace,eventName,eventBody,queryCallbackId,socketCallbackId} = body
+                if(!this.clientSockets[namespace]){
+                    console.log("no namespace found for message!!")
+                    return
+                }
+                console.log(`sending to API: ${eventName} on ${namespace} from relay`)
+                this.clientSockets[namespace].emit(eventName,eventBody,(error:any,response:any)=>{
+                    const messageBody:RelayMessageSocketAck = {
+                        type:'ack',
+                        error,
+                        response,
+                        queryId:queryCallbackId,
+                        socketId:socketCallbackId
+                    }
+                    console.log("got server Ack!")
+                    console.log(messageBody)
+                    this.emitOnRelaySocket('relay:internal:ackFromServer',messageBody)
+                })
+            })
+            
+            this.relaySocket.on('relay:internal:newSocket',(body:RelayMessageNewSocket)=>{
+                if(!body || body.type !== 'socketNew'){
+                    this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
+                }
+                const {namespace} = body
+                if(this.clientSockets[namespace]){
+                    this.clientSockets[namespace].disconnect()
+                    delete this.clientSockets[namespace]
+                }
+                console.log(`creating socket: ${this.baseAddress}:${this.port}${namespace}`)
+                    const socketParamsWithDevice = {
+                        ...socketParams,
+                        auth: {
+                            encryptionId: body.deviceId
+                        }
+                    }
+                    this.clientSockets[namespace] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
+                    this.clientSockets[namespace].onAny((eventName:string,eventBody)=>{
+                        const messageBody:RelayMessageEvent ={
+                            type:'socketEvent',
+                            eventBody,
+                            eventName,
+                            namespace,
+                            queryCallbackId:'', //TODO callback to client
+                            socketCallbackId:'' //TODO callback to client
+                        }
+                        console.log(`got ${eventName} on ${namespace} from API relaying...`)
+                        this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
+                    })
+            })
+            //TODO handle closed socket
+            this.relaySocket.on('relay:internal:httpRequest',async (req:RelayMessageHttpRequest)=>{
+                if(!req || req.type !== 'httpRequest'){
+                    return
+                }
+                const {relayId,requestId,url,method,headers,body} = req
+                try {
+                    const params = {
+                        method,
+                        headers,
+                        body:undefined
+                    }
+                    if(body && method !== 'GET' && method !== 'HEAD'){
+                        params.body= typeof body === 'object' ? JSON.stringify(body) : body
+                    }
+                    console.log(`fetching -> ${this.baseAddress}:${this.port}${url}`)
+                    const res = await fetch(`${this.baseAddress}:${this.port}${url}`,params)
+                    const resBody = await res.text()
+                    const response:RelayMessageHttpResponseOk={
+                        type:'httpResponse',
+                        result:'ok',
+                        relayId,
+                        requestId,
+                        status:res.status,
+                        headers:res.headers,
+                        body:resBody
+                    }
+                    this.emitOnRelaySocket('relay:internal:httpResponse',response)
+                } catch(e) {
+                    console.error(e)
+                    this.emitOnRelaySocket('relay:internal:httpResponse',{
+                        type:'httpResponse',
+                        result:'error',
+                        message:'',
+                        relayId,
+                        requestId
+                    })
+                }
+            })
+            this.relaySocket.on('relay:internal:error',(err)=>{
+                console.error(err)
             })
         })
         
-        this.relaySocket.on('relay:internal:newSocket',(body:RelayMessageNewSocket)=>{
-            if(!body || body.type !== 'socketNew'){
-                this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
-            }
-            const {namespace} = body
-            if(this.clientSockets[namespace]){
-                this.clientSockets[namespace].disconnect()
-                delete this.clientSockets[namespace]
-            }
-            console.log(`creating socket: ${this.baseAddress}:${this.port}${namespace}`)
-                const socketParamsWithDevice = {
-                    ...socketParams,
-                    auth: {
-                        encryptionId: body.deviceId
-                    }
-                }
-                this.clientSockets[namespace] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
-                this.clientSockets[namespace].onAny((eventName:string,eventBody)=>{
-                    const messageBody:RelayMessageEvent ={
-                        type:'socketEvent',
-                        eventBody,
-                        eventName,
-                        namespace,
-                        queryCallbackId:'', //TODO callback to client
-                        socketCallbackId:'' //TODO callback to client
-                    }
-                    console.log(`got ${eventName} on ${namespace} from API relaying...`)
-                    this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
-                })
-        })
-        //TODO handle closed socket
-        this.relaySocket.on('relay:internal:httpRequest',async (req:RelayMessageHttpRequest)=>{
-            if(!req || req.type !== 'httpRequest'){
-                return
-            }
-            const {relayId,requestId,url,method,headers,body} = req
-            try {
-                const params = {
-                    method,
-                    headers,
-                    body:undefined
-                }
-                if(body && method !== 'GET' && method !== 'HEAD'){
-                    params.body= typeof body === 'object' ? JSON.stringify(body) : body
-                }
-                console.log(`fetching -> ${this.baseAddress}:${this.port}${url}`)
-                const res = await fetch(`${this.baseAddress}:${this.port}${url}`,params)
-                const resBody = await res.text()
-                const response:RelayMessageHttpResponseOk={
-                    type:'httpResponse',
-                    result:'ok',
-                    relayId,
-                    requestId,
-                    status:res.status,
-                    headers:res.headers,
-                    body:resBody
-                }
-                this.emitOnRelaySocket('relay:internal:httpResponse',response)
-            } catch(e) {
-                console.error(e)
-                this.emitOnRelaySocket('relay:internal:httpResponse',{
-                    type:'httpResponse',
-                    result:'error',
-                    message:'',
-                    relayId,
-                    requestId
-                })
-            }
-        })
-        this.relaySocket.on('relay:internal:error',(err)=>{
-            console.error(err)
-        })
         this.relaySocket.on('disconnect',reason => {
             console.log(reason)//transport close
         })
@@ -144,19 +143,5 @@ export default class handler {
         this.relaySocket.emit(eventName,eventBody)
     }
 
-    waitAndCheck(time:number,final:boolean,timeouts:NodeJS.Timeout[],cb:(ok:boolean)=>void):NodeJS.Timeout {
-        return setTimeout(()=>{
-            if(this.relaySocket && this.relaySocket.connected){
-                timeouts.forEach(timeout => {
-                    clearTimeout(timeout)
-                })
-                cb(true)
-                return
-            }
-            if(final){
-                cb(false)
-            }
 
-        },time)
-    }
 }

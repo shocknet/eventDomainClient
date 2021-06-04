@@ -74,123 +74,121 @@ var handler = /** @class */ (function () {
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
         this.relaySocket.on('connect', function () {
             console.log("new socket connection event");
-        });
-        var timeouts = [];
-        timeouts.push(this.waitAndCheck(3000, true, timeouts, cb));
-        timeouts.push(this.waitAndCheck(1500, false, timeouts, cb));
-        timeouts.push(this.waitAndCheck(1000, false, timeouts, cb));
-        timeouts.push(this.waitAndCheck(500, false, timeouts, cb));
-        this.relaySocket.emit('hybridRelayToken', {
-            token: params.relayToken,
-            id: params.relayId
-        }, function () {
-        });
-        this.relaySocket.on('relay:internal:messageForward', function (body) {
-            if (!body || body.type !== 'socketEvent') {
-                _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
-            }
-            var namespace = body.namespace, eventName = body.eventName, eventBody = body.eventBody, queryCallbackId = body.queryCallbackId, socketCallbackId = body.socketCallbackId;
-            if (!_this.clientSockets[namespace]) {
-                console.log("no namespace found for message!!");
+            if (!_this.relaySocket) {
                 return;
             }
-            console.log("sending to API: " + eventName + " on " + namespace + " from relay");
-            _this.clientSockets[namespace].emit(eventName, eventBody, function (error, response) {
-                var messageBody = {
-                    type: 'ack',
-                    error: error,
-                    response: response,
-                    queryId: queryCallbackId,
-                    socketId: socketCallbackId
-                };
-                console.log("got server Ack!");
-                console.log(messageBody);
-                _this.emitOnRelaySocket('relay:internal:ackFromServer', messageBody);
+            _this.relaySocket.emit('hybridRelayToken', {
+                token: params.relayToken,
+                id: params.relayId
+            }, function () {
             });
-        });
-        this.relaySocket.on('relay:internal:newSocket', function (body) {
-            if (!body || body.type !== 'socketNew') {
-                _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
-            }
-            var namespace = body.namespace;
-            if (_this.clientSockets[namespace]) {
-                _this.clientSockets[namespace].disconnect();
-                delete _this.clientSockets[namespace];
-            }
-            console.log("creating socket: " + _this.baseAddress + ":" + _this.port + namespace);
-            var socketParamsWithDevice = __assign(__assign({}, socketParams), { auth: {
-                    encryptionId: body.deviceId
-                } });
-            _this.clientSockets[namespace] = socket_io_client_1.default(_this.baseAddress + ":" + _this.port + namespace, socketParamsWithDevice);
-            _this.clientSockets[namespace].onAny(function (eventName, eventBody) {
-                var messageBody = {
-                    type: 'socketEvent',
-                    eventBody: eventBody,
-                    eventName: eventName,
-                    namespace: namespace,
-                    queryCallbackId: '',
-                    socketCallbackId: '' //TODO callback to client
-                };
-                console.log("got " + eventName + " on " + namespace + " from API relaying...");
-                _this.emitOnRelaySocket('relay:internal:messageBackward', messageBody);
-            });
-        });
-        //TODO handle closed socket
-        this.relaySocket.on('relay:internal:httpRequest', function (req) { return __awaiter(_this, void 0, void 0, function () {
-            var relayId, requestId, url, method, headers, body, params_1, res, resBody, response, e_1;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (!req || req.type !== 'httpRequest') {
-                            return [2 /*return*/];
-                        }
-                        relayId = req.relayId, requestId = req.requestId, url = req.url, method = req.method, headers = req.headers, body = req.body;
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, 4, , 5]);
-                        params_1 = {
-                            method: method,
-                            headers: headers,
-                            body: undefined
-                        };
-                        if (body && method !== 'GET' && method !== 'HEAD') {
-                            params_1.body = typeof body === 'object' ? JSON.stringify(body) : body;
-                        }
-                        console.log("fetching -> " + this.baseAddress + ":" + this.port + url);
-                        return [4 /*yield*/, node_fetch_1.default(this.baseAddress + ":" + this.port + url, params_1)];
-                    case 2:
-                        res = _a.sent();
-                        return [4 /*yield*/, res.text()];
-                    case 3:
-                        resBody = _a.sent();
-                        response = {
-                            type: 'httpResponse',
-                            result: 'ok',
-                            relayId: relayId,
-                            requestId: requestId,
-                            status: res.status,
-                            headers: res.headers,
-                            body: resBody
-                        };
-                        this.emitOnRelaySocket('relay:internal:httpResponse', response);
-                        return [3 /*break*/, 5];
-                    case 4:
-                        e_1 = _a.sent();
-                        console.error(e_1);
-                        this.emitOnRelaySocket('relay:internal:httpResponse', {
-                            type: 'httpResponse',
-                            result: 'error',
-                            message: '',
-                            relayId: relayId,
-                            requestId: requestId
-                        });
-                        return [3 /*break*/, 5];
-                    case 5: return [2 /*return*/];
+            _this.relaySocket.on('relay:internal:messageForward', function (body) {
+                if (!body || body.type !== 'socketEvent') {
+                    _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
                 }
+                var namespace = body.namespace, eventName = body.eventName, eventBody = body.eventBody, queryCallbackId = body.queryCallbackId, socketCallbackId = body.socketCallbackId;
+                if (!_this.clientSockets[namespace]) {
+                    console.log("no namespace found for message!!");
+                    return;
+                }
+                console.log("sending to API: " + eventName + " on " + namespace + " from relay");
+                _this.clientSockets[namespace].emit(eventName, eventBody, function (error, response) {
+                    var messageBody = {
+                        type: 'ack',
+                        error: error,
+                        response: response,
+                        queryId: queryCallbackId,
+                        socketId: socketCallbackId
+                    };
+                    console.log("got server Ack!");
+                    console.log(messageBody);
+                    _this.emitOnRelaySocket('relay:internal:ackFromServer', messageBody);
+                });
             });
-        }); });
-        this.relaySocket.on('relay:internal:error', function (err) {
-            console.error(err);
+            _this.relaySocket.on('relay:internal:newSocket', function (body) {
+                if (!body || body.type !== 'socketNew') {
+                    _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
+                }
+                var namespace = body.namespace;
+                if (_this.clientSockets[namespace]) {
+                    _this.clientSockets[namespace].disconnect();
+                    delete _this.clientSockets[namespace];
+                }
+                console.log("creating socket: " + _this.baseAddress + ":" + _this.port + namespace);
+                var socketParamsWithDevice = __assign(__assign({}, socketParams), { auth: {
+                        encryptionId: body.deviceId
+                    } });
+                _this.clientSockets[namespace] = socket_io_client_1.default(_this.baseAddress + ":" + _this.port + namespace, socketParamsWithDevice);
+                _this.clientSockets[namespace].onAny(function (eventName, eventBody) {
+                    var messageBody = {
+                        type: 'socketEvent',
+                        eventBody: eventBody,
+                        eventName: eventName,
+                        namespace: namespace,
+                        queryCallbackId: '',
+                        socketCallbackId: '' //TODO callback to client
+                    };
+                    console.log("got " + eventName + " on " + namespace + " from API relaying...");
+                    _this.emitOnRelaySocket('relay:internal:messageBackward', messageBody);
+                });
+            });
+            //TODO handle closed socket
+            _this.relaySocket.on('relay:internal:httpRequest', function (req) { return __awaiter(_this, void 0, void 0, function () {
+                var relayId, requestId, url, method, headers, body, params_1, res, resBody, response, e_1;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            if (!req || req.type !== 'httpRequest') {
+                                return [2 /*return*/];
+                            }
+                            relayId = req.relayId, requestId = req.requestId, url = req.url, method = req.method, headers = req.headers, body = req.body;
+                            _a.label = 1;
+                        case 1:
+                            _a.trys.push([1, 4, , 5]);
+                            params_1 = {
+                                method: method,
+                                headers: headers,
+                                body: undefined
+                            };
+                            if (body && method !== 'GET' && method !== 'HEAD') {
+                                params_1.body = typeof body === 'object' ? JSON.stringify(body) : body;
+                            }
+                            console.log("fetching -> " + this.baseAddress + ":" + this.port + url);
+                            return [4 /*yield*/, node_fetch_1.default(this.baseAddress + ":" + this.port + url, params_1)];
+                        case 2:
+                            res = _a.sent();
+                            return [4 /*yield*/, res.text()];
+                        case 3:
+                            resBody = _a.sent();
+                            response = {
+                                type: 'httpResponse',
+                                result: 'ok',
+                                relayId: relayId,
+                                requestId: requestId,
+                                status: res.status,
+                                headers: res.headers,
+                                body: resBody
+                            };
+                            this.emitOnRelaySocket('relay:internal:httpResponse', response);
+                            return [3 /*break*/, 5];
+                        case 4:
+                            e_1 = _a.sent();
+                            console.error(e_1);
+                            this.emitOnRelaySocket('relay:internal:httpResponse', {
+                                type: 'httpResponse',
+                                result: 'error',
+                                message: '',
+                                relayId: relayId,
+                                requestId: requestId
+                            });
+                            return [3 /*break*/, 5];
+                        case 5: return [2 /*return*/];
+                    }
+                });
+            }); });
+            _this.relaySocket.on('relay:internal:error', function (err) {
+                console.error(err);
+            });
         });
         this.relaySocket.on('disconnect', function (reason) {
             console.log(reason); //transport close
@@ -201,21 +199,6 @@ var handler = /** @class */ (function () {
             return;
         }
         this.relaySocket.emit(eventName, eventBody);
-    };
-    handler.prototype.waitAndCheck = function (time, final, timeouts, cb) {
-        var _this = this;
-        return setTimeout(function () {
-            if (_this.relaySocket && _this.relaySocket.connected) {
-                timeouts.forEach(function (timeout) {
-                    clearTimeout(timeout);
-                });
-                cb(true);
-                return;
-            }
-            if (final) {
-                cb(false);
-            }
-        }, time);
     };
     return handler;
 }());
