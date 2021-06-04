@@ -76,6 +76,7 @@ var handler = /** @class */ (function () {
         this.relaySocket.emit('hybridRelayToken', {
             token: params.relayToken,
             id: params.relayId
+        }, function () {
         });
         this.relaySocket.on('relay:internal:messageForward', function (body) {
             if (!body || body.type !== 'socketEvent') {
@@ -183,6 +184,9 @@ var handler = /** @class */ (function () {
         }); });
         this.relaySocket.on('relay:internal:error', function (err) {
             console.error(err);
+        });
+        this.relaySocket.on('disconnect', function (reason) {
+            console.log(reason);
         });
     };
     handler.prototype.emitOnRelaySocket = function (eventName, eventBody) {

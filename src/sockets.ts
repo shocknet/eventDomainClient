@@ -25,6 +25,8 @@ export default class handler {
         this.relaySocket.emit('hybridRelayToken', {
             token:params.relayToken,
             id:params.relayId
+        },()=>{
+
         })
         this.relaySocket.on('relay:internal:messageForward',(body:RelayMessageEvent)=>{
             if(!body || body.type !== 'socketEvent'){
@@ -121,6 +123,9 @@ export default class handler {
         })
         this.relaySocket.on('relay:internal:error',(err)=>{
             console.error(err)
+        })
+        this.relaySocket.on('disconnect',reason => {
+            console.log(reason)
         })
     }
     
