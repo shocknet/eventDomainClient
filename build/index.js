@@ -42,8 +42,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var node_fetch_1 = __importDefault(require("node-fetch"));
 var sockets_1 = __importDefault(require("./sockets"));
 var relayAddress = 'http://localhost:3000';
-var relayId = 'd42100d0-c3e2-11eb-ba56-213c4e241c1b';
-var relayToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7InRpbWVzdGFtcCI6MTYyMjY2NjQ1NTM4OSwicmVsYXlJZCI6ImQ0MjEwMGQwLWMzZTItMTFlYi1iYTU2LTIxM2M0ZTI0MWMxYiJ9LCJpYXQiOjE2MjI2NjY0NTUsImV4cCI6NTIyMjY2NjQ1NX0.Vopoa1BvYeAeIgA-DWQpaHEH-avZrSBbsZYm-e8Y0rk';
+var relayId;
+var relayToken;
 var localPort = 9835;
 var socketsHandler = new sockets_1.default(localPort);
 var fetchNewToken = function () { return __awaiter(void 0, void 0, void 0, function () {
@@ -87,25 +87,32 @@ var start = function () { return __awaiter(void 0, void 0, void 0, function () {
         }
     });
 }); };
-start();
-/*
-
-
-
-
-
-socket = io("http://localhost:3000/aaa",{
-    reconnection: true,
-    rejectUnauthorized: false,
-    parser: binaryParser,
-    withCredentials: true,
-    transports: ["websocket"]
-})
-console.log("ei")
-socket.on("connect",()=>{
-    console.log("er")
-    socket.emit("hybridRelayId",{id:"brooh"})
-    socket.emit("swaggd",{id:"brooh"})
-    socket.emit("fdsf",{id:"brooh"})
-})*/ 
+if (process.argv[2] === 'standalone') {
+    start();
+}
+exports.default = (function (message, cb) { return __awaiter(void 0, void 0, void 0, function () {
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                relayId = message.relayId;
+                relayToken = message.relayToken;
+                if (message.address) {
+                    relayAddress = message.address;
+                }
+                if (message.port) {
+                    localPort = message.port;
+                }
+                return [4 /*yield*/, start()];
+            case 1:
+                _a.sent();
+                cb({
+                    relayId: relayId,
+                    relayToken: relayToken,
+                    address: relayAddress,
+                    port: localPort
+                });
+                return [2 /*return*/];
+        }
+    });
+}); });
 //# sourceMappingURL=index.js.map

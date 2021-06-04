@@ -1,4 +1,11 @@
 
+export type ProcessInput = {
+    relayId?:string
+    relayToken?:string
+    port?:number
+    address?:string
+}
+
 
 export type RelayParams = {
     relayId:string
