@@ -72,6 +72,7 @@ var handler = /** @class */ (function () {
     handler.prototype.openRelaySocket = function (params) {
         var _this = this;
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
+        console.log(this.relaySocket);
         this.relaySocket.emit('hybridRelayToken', {
             token: params.relayToken,
             id: params.relayId

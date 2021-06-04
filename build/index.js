@@ -72,7 +72,6 @@ var start = function () { return __awaiter(void 0, void 0, void 0, function () {
                 relayToken = tokenInfo.token;
                 _a.label = 2;
             case 2:
-                console.log({ relayId: relayId, relayToken: relayToken });
                 socketsHandler.openRelaySocket({
                     relayAddress: relayAddress,
                     relayId: relayId,

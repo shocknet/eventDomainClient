@@ -20,7 +20,8 @@ export default class handler {
     relaySocket:Socket|null = null
     clientSockets:Record<string/*namespace*/,Socket> = {}
     openRelaySocket(params:RelayParams) {
-        this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams) 
+        this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
+        console.log(this.relaySocket) 
         this.relaySocket.emit('hybridRelayToken', {
             token:params.relayToken,
             id:params.relayId

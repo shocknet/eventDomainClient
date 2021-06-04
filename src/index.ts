@@ -21,7 +21,6 @@ const start = async () => {
             relayId = tokenInfo.relayId
             relayToken = tokenInfo.token
         }
-        console.log({relayId,relayToken})
 
         socketsHandler.openRelaySocket({
             relayAddress,
