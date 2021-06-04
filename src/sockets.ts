@@ -22,6 +22,11 @@ export default class handler {
     clientSockets:Record<string/*namespace*/,Socket> = {}
     openRelaySocket(params:RelayParams,cb:(connected:boolean)=>void) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
+        const timeouts:NodeJS.Timeout[] = []
+        timeouts.push(this.waitAndCheck(3000,true,timeouts,cb))
+        timeouts.push(this.waitAndCheck(1500,false,timeouts,cb))
+        timeouts.push(this.waitAndCheck(1000,false,timeouts,cb))
+        timeouts.push(this.waitAndCheck(500,false,timeouts,cb))
         this.relaySocket.on('connect',()=>{
             console.log("new socket connection event")
             if(!this.relaySocket){
@@ -142,6 +147,20 @@ export default class handler {
         }
         this.relaySocket.emit(eventName,eventBody)
     }
+    waitAndCheck(time:number,final:boolean,timeouts:NodeJS.Timeout[],cb:(ok:boolean)=>void):NodeJS.Timeout {
+        return setTimeout(()=>{
+            if(this.relaySocket && this.relaySocket.connected){
+                timeouts.forEach(timeout => {
+                    clearTimeout(timeout)
+                })
+                cb(true)
+                return
+            }
+            if(final){
+                cb(false)
+            }
 
+        },time)
+    }
 
 }
