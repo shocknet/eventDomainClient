@@ -1,6 +1,6 @@
 import fetch from 'node-fetch'
 import SocketsHandler from './sockets'
-import { ProcessInput } from './types'
+import { ProcessInput, RelayParams } from './types'
 let relayAddress = 'http://localhost:3000'
 let relayId:string|undefined
 let relayToken: string|undefined
@@ -13,7 +13,7 @@ const fetchNewToken = async  ():Promise<{token:string,relayId:string}> => {
 
 
 
-const start = async () => {
+const start = async ():Promise<boolean> => {
 
     try {
         if(!relayId || !relayToken){
@@ -21,21 +21,26 @@ const start = async () => {
             relayId = tokenInfo.relayId
             relayToken = tokenInfo.token
         }
-
-        socketsHandler.openRelaySocket({
+        const params:RelayParams = {
             relayAddress,
             relayId,
             relayToken
+        }
+        return new Promise(res => {
+            socketsHandler.openRelaySocket(params,connected => {
+                res(connected)
+            })
         })
     } catch(e){
         console.error(e)
+        return false
     }
 }
 if(process.argv[2] === 'standalone'){
     start()
 }
 
-export default async (message:ProcessInput,cb:(filled:ProcessInput)=>void) => {
+export default async (message:ProcessInput,cb:(connected:boolean,filled:ProcessInput)=>void) => {
     relayId = message.relayId
     relayToken = message.relayToken
     if(message.address){
@@ -44,8 +49,8 @@ export default async (message:ProcessInput,cb:(filled:ProcessInput)=>void) => {
     if(message.port){
         localPort = message.port
     }
-    await start()
-    cb({
+    const connected = await start()
+    cb(connected,{
         relayId,
         relayToken,
         address:relayAddress,

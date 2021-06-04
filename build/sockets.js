@@ -69,12 +69,14 @@ var handler = /** @class */ (function () {
         this.port = clientPort;
         this.baseAddress = clientBaseAddress;
     }
-    handler.prototype.openRelaySocket = function (params) {
+    handler.prototype.openRelaySocket = function (params, cb) {
         var _this = this;
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
-        setTimeout(function () {
-            console.log(_this.relaySocket);
-        }, 1000);
+        var timeouts = [];
+        timeouts.push(this.waitAndCheck(3000, true, timeouts, cb));
+        timeouts.push(this.waitAndCheck(1500, false, timeouts, cb));
+        timeouts.push(this.waitAndCheck(1000, false, timeouts, cb));
+        timeouts.push(this.waitAndCheck(500, false, timeouts, cb));
         this.relaySocket.emit('hybridRelayToken', {
             token: params.relayToken,
             id: params.relayId
@@ -196,6 +198,21 @@ var handler = /** @class */ (function () {
             return;
         }
         this.relaySocket.emit(eventName, eventBody);
+    };
+    handler.prototype.waitAndCheck = function (time, final, timeouts, cb) {
+        var _this = this;
+        return setTimeout(function () {
+            if (_this.relaySocket && _this.relaySocket.connected) {
+                timeouts.forEach(function (timeout) {
+                    clearTimeout(timeout);
+                });
+                cb(true);
+                return;
+            }
+            if (final) {
+                cb(false);
+            }
+        }, time);
     };
     return handler;
 }());

@@ -59,7 +59,7 @@ var fetchNewToken = function () { return __awaiter(void 0, void 0, void 0, funct
     });
 }); };
 var start = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var tokenInfo, e_1;
+    var tokenInfo, params_1, e_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -72,16 +72,20 @@ var start = function () { return __awaiter(void 0, void 0, void 0, function () {
                 relayToken = tokenInfo.token;
                 _a.label = 2;
             case 2:
-                socketsHandler.openRelaySocket({
+                params_1 = {
                     relayAddress: relayAddress,
                     relayId: relayId,
                     relayToken: relayToken
-                });
-                return [3 /*break*/, 4];
+                };
+                return [2 /*return*/, new Promise(function (res) {
+                        socketsHandler.openRelaySocket(params_1, function (connected) {
+                            res(connected);
+                        });
+                    })];
             case 3:
                 e_1 = _a.sent();
                 console.error(e_1);
-                return [3 /*break*/, 4];
+                return [2 /*return*/, false];
             case 4: return [2 /*return*/];
         }
     });
@@ -90,6 +94,7 @@ if (process.argv[2] === 'standalone') {
     start();
 }
 exports.default = (function (message, cb) { return __awaiter(void 0, void 0, void 0, function () {
+    var connected;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -103,8 +108,8 @@ exports.default = (function (message, cb) { return __awaiter(void 0, void 0, voi
                 }
                 return [4 /*yield*/, start()];
             case 1:
-                _a.sent();
-                cb({
+                connected = _a.sent();
+                cb(connected, {
                     relayId: relayId,
                     relayToken: relayToken,
                     address: relayAddress,

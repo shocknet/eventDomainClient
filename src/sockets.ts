@@ -10,6 +10,7 @@ const socketParams = {
     withCredentials: true,
     transports: ["websocket"]
 }
+
 export default class handler {
     constructor(clientPort:number,clientBaseAddress='http://localhost'){
         this.port = clientPort
@@ -19,11 +20,13 @@ export default class handler {
     baseAddress:string
     relaySocket:Socket|null = null
     clientSockets:Record<string/*namespace*/,Socket> = {}
-    openRelaySocket(params:RelayParams) {
+    openRelaySocket(params:RelayParams,cb:(connected:boolean)=>void) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
-        setTimeout(()=>{
-            console.log(this.relaySocket) 
-        },1000)
+        const timeouts:NodeJS.Timeout[] = []
+        timeouts.push(this.waitAndCheck(3000,true,timeouts,cb))
+        timeouts.push(this.waitAndCheck(1500,false,timeouts,cb))
+        timeouts.push(this.waitAndCheck(1000,false,timeouts,cb))
+        timeouts.push(this.waitAndCheck(500,false,timeouts,cb))
         this.relaySocket.emit('hybridRelayToken', {
             token:params.relayToken,
             id:params.relayId
@@ -136,5 +139,21 @@ export default class handler {
             return
         }
         this.relaySocket.emit(eventName,eventBody)
+    }
+
+    waitAndCheck(time:number,final:boolean,timeouts:NodeJS.Timeout[],cb:(ok:boolean)=>void):NodeJS.Timeout {
+        return setTimeout(()=>{
+            if(this.relaySocket && this.relaySocket.connected){
+                timeouts.forEach(timeout => {
+                    clearTimeout(timeout)
+                })
+                cb(true)
+                return
+            }
+            if(final){
+                cb(false)
+            }
+
+        },time)
     }
 }
