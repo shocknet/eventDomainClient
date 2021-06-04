@@ -22,6 +22,9 @@ export default class handler {
     clientSockets:Record<string/*namespace*/,Socket> = {}
     openRelaySocket(params:RelayParams,cb:(connected:boolean)=>void) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
+        this.relaySocket.on('connect',()=>{
+            console.log("new socket connection event")
+        })
         const timeouts:NodeJS.Timeout[] = []
         timeouts.push(this.waitAndCheck(3000,true,timeouts,cb))
         timeouts.push(this.waitAndCheck(1500,false,timeouts,cb))

@@ -72,6 +72,9 @@ var handler = /** @class */ (function () {
     handler.prototype.openRelaySocket = function (params, cb) {
         var _this = this;
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
+        this.relaySocket.on('connect', function () {
+            console.log("new socket connection event");
+        });
         var timeouts = [];
         timeouts.push(this.waitAndCheck(3000, true, timeouts, cb));
         timeouts.push(this.waitAndCheck(1500, false, timeouts, cb));
