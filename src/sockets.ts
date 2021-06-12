@@ -137,7 +137,7 @@ export default class handler {
         })
         
         this.relaySocket.on('disconnect',reason => {
-            console.log(reason)//transport close
+            console.log("relay socket disconnected:"+reason)//transport close
         })
     }
     
