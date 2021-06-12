@@ -8,7 +8,8 @@ const socketParams = {
     rejectUnauthorized: false,
     parser: binaryParser,
     withCredentials: true,
-    transports: ["websocket"]
+    transports: ["websocket"],
+    upgrade:false
 }
 
 export default class handler {
