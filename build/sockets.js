@@ -196,7 +196,7 @@ var handler = /** @class */ (function () {
             });
         });
         this.relaySocket.on('disconnect', function (reason) {
-            console.log(reason); //transport close
+            console.log("relay socket disconnected:" + reason); //transport close
         });
     };
     handler.prototype.emitOnRelaySocket = function (eventName, eventBody) {
