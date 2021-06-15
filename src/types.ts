@@ -69,3 +69,8 @@ export type RelayMessageSocketAck = {
     response:any
 }
 export type RelayMessage = RelayMessageHttpRequest | RelayMessageHttpResponse | RelayMessageEvent | RelayMessageNewSocket | RelayMessageDisconnected | RelayErrorMessage | RelayMessageSocketAck
+
+export type ExistingSockets = {
+    namespace: string
+    deviceId: string
+}

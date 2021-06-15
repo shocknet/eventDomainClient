@@ -59,7 +59,8 @@ var socketParams = {
     rejectUnauthorized: false,
     parser: socket_io_msgpack_parser_1.default,
     withCredentials: true,
-    transports: ["websocket"]
+    transports: ["websocket"],
+    upgrade: false
 };
 var handler = /** @class */ (function () {
     function handler(clientPort, clientBaseAddress) {
@@ -85,7 +86,10 @@ var handler = /** @class */ (function () {
             _this.relaySocket.emit('hybridRelayToken', {
                 token: params.relayToken,
                 id: params.relayId
-            }, function () {
+            }, function (existing) {
+                existing.forEach(function (oldSocket) {
+                    _this.openClientSocket(oldSocket);
+                });
             });
             _this.relaySocket.on('relay:internal:messageForward', function (body) {
                 if (!body || body.type !== 'socketEvent') {
@@ -96,7 +100,6 @@ var handler = /** @class */ (function () {
                     console.log("no namespace found for message!!");
                     return;
                 }
-                console.log("sending to API: " + eventName + " on " + namespace + " from relay");
                 _this.clientSockets[namespace].emit(eventName, eventBody, function (error, response) {
                     var messageBody = {
                         type: 'ack',
@@ -105,8 +108,6 @@ var handler = /** @class */ (function () {
                         queryId: queryCallbackId,
                         socketId: socketCallbackId
                     };
-                    console.log("got server Ack!");
-                    console.log(messageBody);
                     _this.emitOnRelaySocket('relay:internal:ackFromServer', messageBody);
                 });
             });
@@ -114,28 +115,7 @@ var handler = /** @class */ (function () {
                 if (!body || body.type !== 'socketNew') {
                     _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
                 }
-                var namespace = body.namespace;
-                if (_this.clientSockets[namespace]) {
-                    _this.clientSockets[namespace].disconnect();
-                    delete _this.clientSockets[namespace];
-                }
-                console.log("creating socket: " + _this.baseAddress + ":" + _this.port + namespace);
-                var socketParamsWithDevice = __assign(__assign({}, socketParams), { auth: {
-                        encryptionId: body.deviceId
-                    } });
-                _this.clientSockets[namespace] = socket_io_client_1.default(_this.baseAddress + ":" + _this.port + namespace, socketParamsWithDevice);
-                _this.clientSockets[namespace].onAny(function (eventName, eventBody) {
-                    var messageBody = {
-                        type: 'socketEvent',
-                        eventBody: eventBody,
-                        eventName: eventName,
-                        namespace: namespace,
-                        queryCallbackId: '',
-                        socketCallbackId: '' //TODO callback to client
-                    };
-                    console.log("got " + eventName + " on " + namespace + " from API relaying...");
-                    _this.emitOnRelaySocket('relay:internal:messageBackward', messageBody);
-                });
+                _this.openClientSocket(body);
             });
             //TODO handle closed socket
             _this.relaySocket.on('relay:internal:httpRequest', function (req) { return __awaiter(_this, void 0, void 0, function () {
@@ -158,7 +138,6 @@ var handler = /** @class */ (function () {
                             if (body && method !== 'GET' && method !== 'HEAD') {
                                 params_1.body = typeof body === 'object' ? JSON.stringify(body) : body;
                             }
-                            console.log("fetching -> " + this.baseAddress + ":" + this.port + url);
                             return [4 /*yield*/, node_fetch_1.default(this.baseAddress + ":" + this.port + url, params_1)];
                         case 2:
                             res = _a.sent();
@@ -197,6 +176,30 @@ var handler = /** @class */ (function () {
         });
         this.relaySocket.on('disconnect', function (reason) {
             console.log("relay socket disconnected:" + reason); //transport close
+        });
+    };
+    handler.prototype.openClientSocket = function (body) {
+        var _this = this;
+        var namespace = body.namespace;
+        if (this.clientSockets[namespace]) {
+            this.clientSockets[namespace].disconnect();
+            delete this.clientSockets[namespace];
+        }
+        console.log("creating socket: " + this.baseAddress + ":" + this.port + namespace);
+        var socketParamsWithDevice = __assign(__assign({}, socketParams), { auth: {
+                encryptionId: body.deviceId
+            } });
+        this.clientSockets[namespace] = socket_io_client_1.default(this.baseAddress + ":" + this.port + namespace, socketParamsWithDevice);
+        this.clientSockets[namespace].onAny(function (eventName, eventBody) {
+            var messageBody = {
+                type: 'socketEvent',
+                eventBody: eventBody,
+                eventName: eventName,
+                namespace: namespace,
+                queryCallbackId: '',
+                socketCallbackId: '' //TODO callback to client
+            };
+            _this.emitOnRelaySocket('relay:internal:messageBackward', messageBody);
         });
     };
     handler.prototype.emitOnRelaySocket = function (eventName, eventBody) {

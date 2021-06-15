@@ -2,7 +2,7 @@ import io,{Socket} from 'socket.io-client'
 //@ts-expect-error
 import binaryParser from 'socket.io-msgpack-parser'
 import fetch from 'node-fetch'
-import { RelayParams,RelayMessageEvent, RelayMessage, RelayMessageNewSocket, RelayMessageHttpRequest, RelayMessageHttpResponse, RelayMessageHttpResponseOk,RelayMessageSocketAck } from './types';
+import { RelayParams,RelayMessageEvent, RelayMessage, RelayMessageNewSocket, RelayMessageHttpRequest, RelayMessageHttpResponse, RelayMessageHttpResponseOk,RelayMessageSocketAck, ExistingSockets } from './types';
 const socketParams = {
     reconnection: true,
     rejectUnauthorized: false,
@@ -36,8 +36,10 @@ export default class handler {
             this.relaySocket.emit('hybridRelayToken', {
                 token:params.relayToken,
                 id:params.relayId
-            },()=>{
-    
+            },(existing:ExistingSockets[])=>{
+                existing.forEach(oldSocket => {
+                    this.openClientSocket(oldSocket)
+                })
             })
             this.relaySocket.on('relay:internal:messageForward',(body:RelayMessageEvent)=>{
                 if(!body || body.type !== 'socketEvent'){
@@ -48,7 +50,6 @@ export default class handler {
                     console.log("no namespace found for message!!")
                     return
                 }
-                console.log(`sending to API: ${eventName} on ${namespace} from relay`)
                 this.clientSockets[namespace].emit(eventName,eventBody,(error:any,response:any)=>{
                     const messageBody:RelayMessageSocketAck = {
                         type:'ack',
@@ -57,8 +58,6 @@ export default class handler {
                         queryId:queryCallbackId,
                         socketId:socketCallbackId
                     }
-                    console.log("got server Ack!")
-                    console.log(messageBody)
                     this.emitOnRelaySocket('relay:internal:ackFromServer',messageBody)
                 })
             })
@@ -67,31 +66,7 @@ export default class handler {
                 if(!body || body.type !== 'socketNew'){
                     this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
                 }
-                const {namespace} = body
-                if(this.clientSockets[namespace]){
-                    this.clientSockets[namespace].disconnect()
-                    delete this.clientSockets[namespace]
-                }
-                console.log(`creating socket: ${this.baseAddress}:${this.port}${namespace}`)
-                    const socketParamsWithDevice = {
-                        ...socketParams,
-                        auth: {
-                            encryptionId: body.deviceId
-                        }
-                    }
-                    this.clientSockets[namespace] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
-                    this.clientSockets[namespace].onAny((eventName:string,eventBody)=>{
-                        const messageBody:RelayMessageEvent ={
-                            type:'socketEvent',
-                            eventBody,
-                            eventName,
-                            namespace,
-                            queryCallbackId:'', //TODO callback to client
-                            socketCallbackId:'' //TODO callback to client
-                        }
-                        console.log(`got ${eventName} on ${namespace} from API relaying...`)
-                        this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
-                    })
+                this.openClientSocket(body)
             })
             //TODO handle closed socket
             this.relaySocket.on('relay:internal:httpRequest',async (req:RelayMessageHttpRequest)=>{
@@ -108,7 +83,6 @@ export default class handler {
                     if(body && method !== 'GET' && method !== 'HEAD'){
                         params.body= typeof body === 'object' ? JSON.stringify(body) : body
                     }
-                    console.log(`fetching -> ${this.baseAddress}:${this.port}${url}`)
                     const res = await fetch(`${this.baseAddress}:${this.port}${url}`,params)
                     const resBody = await res.text()
                     const response:RelayMessageHttpResponseOk={
@@ -140,6 +114,33 @@ export default class handler {
         this.relaySocket.on('disconnect',reason => {
             console.log("relay socket disconnected:"+reason)//transport close
         })
+    }
+
+    openClientSocket(body:{namespace:string,deviceId:string}){
+        const {namespace} = body
+        if(this.clientSockets[namespace]){
+            this.clientSockets[namespace].disconnect()
+            delete this.clientSockets[namespace]
+        }
+        console.log(`creating socket: ${this.baseAddress}:${this.port}${namespace}`)
+            const socketParamsWithDevice = {
+                ...socketParams,
+                auth: {
+                    encryptionId: body.deviceId
+                }
+            }
+            this.clientSockets[namespace] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
+            this.clientSockets[namespace].onAny((eventName:string,eventBody)=>{
+                const messageBody:RelayMessageEvent ={
+                    type:'socketEvent',
+                    eventBody,
+                    eventName,
+                    namespace,
+                    queryCallbackId:'', //TODO callback to client
+                    socketCallbackId:'' //TODO callback to client
+                }
+                this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
+            })
     }
     
     emitOnRelaySocket(eventName:string, eventBody:RelayMessage){
