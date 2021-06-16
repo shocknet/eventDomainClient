@@ -5,7 +5,8 @@ let relayAddress = 'http://localhost:3000'
 let relayId:string|undefined
 let relayToken: string|undefined
 let localPort = 9835
-const socketsHandler = new SocketsHandler(localPort)
+const CURRENT_ED_VERSION = 1
+const socketsHandler = new SocketsHandler(localPort,CURRENT_ED_VERSION)
 const fetchNewToken = async  ():Promise<{token:string,relayId:string}> => {
     const res = await fetch(`${relayAddress}/reservedHybridRelayCreate`,{method:'POST'})
     return await res.json()

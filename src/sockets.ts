@@ -13,14 +13,16 @@ const socketParams = {
 }
 
 export default class handler {
-    constructor(clientPort:number,clientBaseAddress='http://localhost'){
+    constructor(clientPort:number,version:number,clientBaseAddress='http://localhost'){
         this.port = clientPort
         this.baseAddress= clientBaseAddress
+        this.currentVersion = version
     }
+    currentVersion:number
     port:number
     baseAddress:string
     relaySocket:Socket|null = null
-    clientSockets:Record<string/*namespace*/,Socket> = {}
+    clientSockets:Record<string/*namespace*/,Record<string/*deviceId*/,Socket>> = {}
     openRelaySocket(params:RelayParams,cb:(connected:boolean)=>void) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
         const timeouts:NodeJS.Timeout[] = []
@@ -35,7 +37,8 @@ export default class handler {
             }
             this.relaySocket.emit('hybridRelayToken', {
                 token:params.relayToken,
-                id:params.relayId
+                id:params.relayId,
+                version:this.currentVersion
             },(existing:ExistingSockets[])=>{
                 existing.forEach(oldSocket => {
                     this.openClientSocket(oldSocket)
@@ -45,12 +48,16 @@ export default class handler {
                 if(!body || body.type !== 'socketEvent'){
                     this.emitOnRelaySocket('relay:internal:error',{type:'error',message:''})
                 }
-                const {namespace,eventName,eventBody,queryCallbackId,socketCallbackId} = body
+                const {namespace,eventName,eventBody,queryCallbackId,socketCallbackId,deviceId} = body
                 if(!this.clientSockets[namespace]){
                     console.log("no namespace found for message!!")
                     return
                 }
-                this.clientSockets[namespace].emit(eventName,eventBody,(error:any,response:any)=>{
+                if(!this.clientSockets[namespace][deviceId]){
+                    console.log("no deviceId found for message!!")
+                    return
+                }
+                this.clientSockets[namespace][deviceId].emit(eventName,eventBody,(error:any,response:any)=>{
                     const messageBody:RelayMessageSocketAck = {
                         type:'ack',
                         error,
@@ -117,30 +124,34 @@ export default class handler {
     }
 
     openClientSocket(body:{namespace:string,deviceId:string}){
-        const {namespace} = body
-        if(this.clientSockets[namespace]){
-            this.clientSockets[namespace].disconnect()
-            delete this.clientSockets[namespace]
+        const {namespace,deviceId} = body
+        if(this.clientSockets[namespace] && this.clientSockets[namespace][deviceId]){
+            this.clientSockets[namespace][deviceId].disconnect()
+            delete this.clientSockets[namespace][deviceId]
         }
         console.log(`creating socket: ${this.baseAddress}:${this.port}${namespace}`)
-            const socketParamsWithDevice = {
-                ...socketParams,
-                auth: {
-                    encryptionId: body.deviceId
-                }
+        const socketParamsWithDevice = {
+            ...socketParams,
+            auth: {
+                encryptionId: deviceId
             }
-            this.clientSockets[namespace] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
-            this.clientSockets[namespace].onAny((eventName:string,eventBody)=>{
-                const messageBody:RelayMessageEvent ={
-                    type:'socketEvent',
-                    eventBody,
-                    eventName,
-                    namespace,
-                    queryCallbackId:'', //TODO callback to client
-                    socketCallbackId:'' //TODO callback to client
-                }
-                this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
-            })
+        }
+        if(!this.clientSockets[namespace]){
+            this.clientSockets[namespace] = {}
+        }
+        this.clientSockets[namespace][deviceId] = io(`${this.baseAddress}:${this.port}${namespace}`,socketParamsWithDevice)
+        this.clientSockets[namespace][deviceId].onAny((eventName:string,eventBody)=>{
+            const messageBody:RelayMessageEvent ={
+                type:'socketEvent',
+                eventBody,
+                eventName,
+                namespace,
+                deviceId,
+                queryCallbackId:'', //TODO callback to client
+                socketCallbackId:'' //TODO callback to client
+            }
+            this.emitOnRelaySocket('relay:internal:messageBackward',messageBody)
+        })
     }
     
     emitOnRelaySocket(eventName:string, eventBody:RelayMessage){

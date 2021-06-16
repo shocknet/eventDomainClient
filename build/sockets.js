@@ -63,12 +63,13 @@ var socketParams = {
     upgrade: false
 };
 var handler = /** @class */ (function () {
-    function handler(clientPort, clientBaseAddress) {
+    function handler(clientPort, version, clientBaseAddress) {
         if (clientBaseAddress === void 0) { clientBaseAddress = 'http://localhost'; }
         this.relaySocket = null;
         this.clientSockets = {};
         this.port = clientPort;
         this.baseAddress = clientBaseAddress;
+        this.currentVersion = version;
     }
     handler.prototype.openRelaySocket = function (params, cb) {
         var _this = this;
@@ -85,7 +86,8 @@ var handler = /** @class */ (function () {
             }
             _this.relaySocket.emit('hybridRelayToken', {
                 token: params.relayToken,
-                id: params.relayId
+                id: params.relayId,
+                version: _this.currentVersion
             }, function (existing) {
                 existing.forEach(function (oldSocket) {
                     _this.openClientSocket(oldSocket);
@@ -95,12 +97,16 @@ var handler = /** @class */ (function () {
                 if (!body || body.type !== 'socketEvent') {
                     _this.emitOnRelaySocket('relay:internal:error', { type: 'error', message: '' });
                 }
-                var namespace = body.namespace, eventName = body.eventName, eventBody = body.eventBody, queryCallbackId = body.queryCallbackId, socketCallbackId = body.socketCallbackId;
+                var namespace = body.namespace, eventName = body.eventName, eventBody = body.eventBody, queryCallbackId = body.queryCallbackId, socketCallbackId = body.socketCallbackId, deviceId = body.deviceId;
                 if (!_this.clientSockets[namespace]) {
                     console.log("no namespace found for message!!");
                     return;
                 }
-                _this.clientSockets[namespace].emit(eventName, eventBody, function (error, response) {
+                if (!_this.clientSockets[namespace][deviceId]) {
+                    console.log("no deviceId found for message!!");
+                    return;
+                }
+                _this.clientSockets[namespace][deviceId].emit(eventName, eventBody, function (error, response) {
                     var messageBody = {
                         type: 'ack',
                         error: error,
@@ -180,22 +186,26 @@ var handler = /** @class */ (function () {
     };
     handler.prototype.openClientSocket = function (body) {
         var _this = this;
-        var namespace = body.namespace;
-        if (this.clientSockets[namespace]) {
-            this.clientSockets[namespace].disconnect();
-            delete this.clientSockets[namespace];
+        var namespace = body.namespace, deviceId = body.deviceId;
+        if (this.clientSockets[namespace] && this.clientSockets[namespace][deviceId]) {
+            this.clientSockets[namespace][deviceId].disconnect();
+            delete this.clientSockets[namespace][deviceId];
         }
         console.log("creating socket: " + this.baseAddress + ":" + this.port + namespace);
         var socketParamsWithDevice = __assign(__assign({}, socketParams), { auth: {
-                encryptionId: body.deviceId
+                encryptionId: deviceId
             } });
-        this.clientSockets[namespace] = socket_io_client_1.default(this.baseAddress + ":" + this.port + namespace, socketParamsWithDevice);
-        this.clientSockets[namespace].onAny(function (eventName, eventBody) {
+        if (!this.clientSockets[namespace]) {
+            this.clientSockets[namespace] = {};
+        }
+        this.clientSockets[namespace][deviceId] = socket_io_client_1.default(this.baseAddress + ":" + this.port + namespace, socketParamsWithDevice);
+        this.clientSockets[namespace][deviceId].onAny(function (eventName, eventBody) {
             var messageBody = {
                 type: 'socketEvent',
                 eventBody: eventBody,
                 eventName: eventName,
                 namespace: namespace,
+                deviceId: deviceId,
                 queryCallbackId: '',
                 socketCallbackId: '' //TODO callback to client
             };

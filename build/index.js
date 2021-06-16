@@ -45,7 +45,8 @@ var relayAddress = 'http://localhost:3000';
 var relayId;
 var relayToken;
 var localPort = 9835;
-var socketsHandler = new sockets_1.default(localPort);
+var CURRENT_ED_VERSION = 1;
+var socketsHandler = new sockets_1.default(localPort, CURRENT_ED_VERSION);
 var fetchNewToken = function () { return __awaiter(void 0, void 0, void 0, function () {
     var res;
     return __generator(this, function (_a) {
