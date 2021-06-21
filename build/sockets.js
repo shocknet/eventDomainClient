@@ -63,25 +63,26 @@ var socketParams = {
     upgrade: false
 };
 var handler = /** @class */ (function () {
-    function handler(clientPort, version, clientBaseAddress) {
+    function handler(clientPort, version, timeoutMs, clientBaseAddress) {
         if (clientBaseAddress === void 0) { clientBaseAddress = 'http://localhost'; }
         this.relaySocket = null;
         this.clientSockets = {};
         this.port = clientPort;
         this.baseAddress = clientBaseAddress;
         this.currentVersion = version;
+        this.connectionTimeoutMs = timeoutMs;
     }
     handler.prototype.openRelaySocket = function (params, cb) {
         var _this = this;
         this.relaySocket = socket_io_client_1.default(params.relayAddress + "/reservedHybridRelayNamespace", socketParams);
-        var timeouts = [];
-        timeouts.push(this.waitAndCheck(3000, true, timeouts, cb));
-        timeouts.push(this.waitAndCheck(1500, false, timeouts, cb));
-        timeouts.push(this.waitAndCheck(1000, false, timeouts, cb));
-        timeouts.push(this.waitAndCheck(500, false, timeouts, cb));
+        var timeout = setTimeout(function () {
+            cb(false);
+        }, this.connectionTimeoutMs);
         this.relaySocket.on('connect', function () {
+            clearTimeout(timeout);
             console.log("new socket connection event");
             if (!_this.relaySocket) {
+                cb(false);
                 return;
             }
             _this.relaySocket.emit('hybridRelayToken', {
@@ -89,6 +90,7 @@ var handler = /** @class */ (function () {
                 id: params.relayId,
                 version: _this.currentVersion
             }, function (existing) {
+                cb(true);
                 existing.forEach(function (oldSocket) {
                     _this.openClientSocket(oldSocket);
                 });
@@ -217,21 +219,6 @@ var handler = /** @class */ (function () {
             return;
         }
         this.relaySocket.emit(eventName, eventBody);
-    };
-    handler.prototype.waitAndCheck = function (time, final, timeouts, cb) {
-        var _this = this;
-        return setTimeout(function () {
-            if (_this.relaySocket && _this.relaySocket.connected) {
-                timeouts.forEach(function (timeout) {
-                    clearTimeout(timeout);
-                });
-                cb(true);
-                return;
-            }
-            if (final) {
-                cb(false);
-            }
-        }, time);
     };
     return handler;
 }());

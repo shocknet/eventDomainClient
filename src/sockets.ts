@@ -13,26 +13,29 @@ const socketParams = {
 }
 
 export default class handler {
-    constructor(clientPort:number,version:number,clientBaseAddress='http://localhost'){
+    constructor(clientPort:number,version:number,timeoutMs:number, clientBaseAddress='http://localhost'){
         this.port = clientPort
         this.baseAddress= clientBaseAddress
         this.currentVersion = version
+        this.connectionTimeoutMs = timeoutMs
     }
     currentVersion:number
     port:number
+    connectionTimeoutMs:number
     baseAddress:string
     relaySocket:Socket|null = null
     clientSockets:Record<string/*namespace*/,Record<string/*deviceId*/,Socket>> = {}
     openRelaySocket(params:RelayParams,cb:(connected:boolean)=>void) {
         this.relaySocket = io(`${params.relayAddress}/reservedHybridRelayNamespace`,socketParams)
-        const timeouts:NodeJS.Timeout[] = []
-        timeouts.push(this.waitAndCheck(3000,true,timeouts,cb))
-        timeouts.push(this.waitAndCheck(1500,false,timeouts,cb))
-        timeouts.push(this.waitAndCheck(1000,false,timeouts,cb))
-        timeouts.push(this.waitAndCheck(500,false,timeouts,cb))
+        const timeout = setTimeout(() => {
+            cb(false)
+        }, this.connectionTimeoutMs)
         this.relaySocket.on('connect',()=>{
+            clearTimeout(timeout)
+            
             console.log("new socket connection event")
             if(!this.relaySocket){
+                cb(false)
                 return
             }
             this.relaySocket.emit('hybridRelayToken', {
@@ -40,6 +43,7 @@ export default class handler {
                 id:params.relayId,
                 version:this.currentVersion
             },(existing:ExistingSockets[])=>{
+                cb(true)
                 existing.forEach(oldSocket => {
                     this.openClientSocket(oldSocket)
                 })
@@ -160,20 +164,4 @@ export default class handler {
         }
         this.relaySocket.emit(eventName,eventBody)
     }
-    waitAndCheck(time:number,final:boolean,timeouts:NodeJS.Timeout[],cb:(ok:boolean)=>void):NodeJS.Timeout {
-        return setTimeout(()=>{
-            if(this.relaySocket && this.relaySocket.connected){
-                timeouts.forEach(timeout => {
-                    clearTimeout(timeout)
-                })
-                cb(true)
-                return
-            }
-            if(final){
-                cb(false)
-            }
-
-        },time)
-    }
-
 }
